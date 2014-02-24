@@ -71,16 +71,10 @@ This framework can be extended by adding classes for particular (sub)class
 import os
 import sys
 import string
-import pdb
-
-import tables
-import numpy
-import pyhdf.HDF
-import pyhdf.V
-import pyhdf.VS
-import pyhdf.SD
-
 import filetypes
+
+import numpy
+
 
 def SupportedFileTypes():
     '''Return a list of supported file types'''
@@ -89,6 +83,7 @@ def SupportedFileTypes():
 
 def getOrbitNumber(fPath):    
     '''Takes in the path to a nasa omi hdf file and returns the orbit number'''
+    import tables
     fid = tables.openFile(fPath)
     try:
         node = fid.getNode('/', 'HDFEOS INFORMATION/CoreMetadata')
@@ -106,6 +101,7 @@ def getOrbitNumber(fPath):
 
 def getLongName(fPath):
     '''Retrieve the long name of an HDFEOS file'''
+    import tables
     fid = tables.openFile(fPath)
     try:
         node = fid.getNode('/', 'HDFEOS INFORMATION/ArchiveMetadata')
@@ -162,6 +158,7 @@ class GeoFile():
 class HDF4File(GeoFile):
     """Provide generic interface for HDF 4 files"""
     def __init__(self, filename, subtype='', extension=None):
+        import pyhdf.HDF
         GeoFile.__init__(self, filename, subtype=subtype, extension=extension)
         if pyhdf.HDF.ishdf(self.name):
             pass
@@ -185,6 +182,7 @@ class HDF4File(GeoFile):
         To repeat, if the interfaces are passed in they will NOT be
         safely closed.
         """
+        import pyhdf.HDF
         leafName = pathList[-1] # name of the leaf we want
         # get it the easy way if it's a scientific dataset
         sciData = sdInt.datasets()
@@ -245,6 +243,8 @@ class HDF4File(GeoFile):
                         n is the number of fundamental dimensions of the 
                         file type.
         """
+        import pyhdf.HDF
+        import pyhdf.SD
         fid = pyhdf.HDF.HDF(self.name)
         try:
             vInt = fid.vgstart()
@@ -300,6 +300,8 @@ class HDF4File(GeoFile):
 
     def __enter__(self):
         '''Open up file and leave open.'''
+        import pyhdf.HDF
+        import pyhdf.SD
         self._fid = pyhdf.HDF.HDF(self.name)
         self._open_vars = dict()
         self._vsInt = self._fid.vstart()
@@ -378,6 +380,7 @@ class HDF4File(GeoFile):
 class HDFFile(GeoFile):
     """Provide generic interface for HDF 5 files"""
     def __init__(self, filename, subtype='', extension=None):
+        import tables
         GeoFile.__init__(self, filename, subtype=subtype, extension=extension)
         if tables.isHDF5File(self.name):  # sanity check
             pass
@@ -400,6 +403,7 @@ class HDFFile(GeoFile):
                         n is the number of fundamental dimensions of the 
                         file type.
         """
+        import tables
         fid = tables.openFile(self.name)
         try:
             var = fid.getNode('/', self._nameExpMap[key])
@@ -442,6 +446,7 @@ class HDFFile(GeoFile):
         the parser have _nameExpMap and _indexMap variables.  These must be
         defined as above.
         """
+        import tables
         # open the var if it isn't open already
         if key not in self._open_vars.keys():
             try:
@@ -482,6 +487,7 @@ class HDFFile(GeoFile):
             
     def __enter__(self):
         '''Open up file and leave open.'''
+        import tables
         self._fid = tables.openFile(self.name, mode='r')
         self._open_vars = dict()
         self._scales = dict()
@@ -604,6 +610,7 @@ class HDFnasaomil2_File(HDFFile):
                  cornerFileList=None):
         HDFFile.__init__(self, filename, subtype, extension)
 
+        import tables
         # make sure filename is actually an input file
         if getLongName(filename) != HDFnasaomil2_File.OMIAURANO2_FILE_NAME:
             raise IOError('Attempt to read non-NASA OMI L2 file as such.')
@@ -751,6 +758,7 @@ class HDFnasaomil2_File(HDFFile):
         
         Throws IOError if no pixel corner file specified
         '''
+        import tables
         latNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLatitude'
         lonNodeName = '/HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Data Fields/FoV75CornerLongitude'
         try:
