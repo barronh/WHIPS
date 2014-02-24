@@ -361,6 +361,17 @@ class OMNO2e_netCDF_avg_out_func(out_func):
                                      'valid pixels.\n{ OMI KNMI - Tropo' \
                                      'sphericColumnFlag\n  OMI NASA - vcd' \
                                      'QualityFlags }',None),
+                'customCriteria' : ('A string that can be evaluated' \
+                                    'according to the syntax in the OMNO2d' \
+                                    'Description field as described in the' \
+                                    'file specification document, except that'\
+                                    'data is pre-scaled. For example:\n'\
+                                    '\t"SolarZenithAngle=[0:85],CloudFraction=[0:0.3],VcdQualityFlags=~19,XTrackQualityFlags=0,RootMeanSquareErrorOfFit=[0:0.0003],TerrainReflectivity=[0:0.3]"\n\n' \
+                                    'would be interpreted as zenith between 0 and 85;'\
+                                    'cloud fraction and terrain reflectivity must '\
+                                    'be between  0 and 0.3; VcdQualityFlags'\
+                                    'exclude 1, 2, 16, 17, 18, and 19; XTrackQualityFlags'\
+                                    'only include zeros; and RMS must be between 0 and 0.0003', None),
                 'cloudFrac' : ('The name of the field containing the ' \
                                'cloud fractions\n{ OMI KNMI - CloudFraction' \
                                '\n  OMI NASA - CloudFraction }',None),
@@ -461,7 +472,8 @@ class OMNO2e_netCDF_avg_out_func(out_func):
         # even though IO interface handles casting already,
         # a catchblock has been added here for safety
         # in case someone wants to use this class directly
-        castDict = {'overallQualFlag':str, 'cloudFrac':str,
+        castDict = {'customCriteria':str,
+                    'overallQualFlag':str, 'cloudFrac':str,
                     'solarZenithAngle':str, 'time':str,
                     'longitude':str, 'inFieldNames':list,
                     'outFieldNames':list, 'outUnits':list,
@@ -509,6 +521,11 @@ class OMNO2e_netCDF_avg_out_func(out_func):
             maps = [maps] # create list if we only got a single map
         
         for map in maps:
+            cldskips = 0
+            sumskips = 0
+            zenskips = 0
+            cstskips = 0
+            checked = 0
             # open up context manager
             with map.pop('parser') as parser: # remove parser for looping
                 if verbose:
@@ -524,23 +541,45 @@ class OMNO2e_netCDF_avg_out_func(out_func):
                     gridInd = (gridRow - minRow, gridCol - minCol)
                     # get the values needed to calculate weight
                     for (pxInd, unused_weight) in pixTup:
+                        checked += 1
+                        custskip = False
+                        for customCheck in self.parmDict['customCriteria'].split(','):
+                            customVar, crit = [x.strip() for x in  customCheck.split('=')]
+                            custField = parser.get_cm(customVar, pxInd)
+                            if ':' in crit:
+                                low, hi = [eval(x.strip()) for x in crit.replace('[', '').replace(']', '').split(':')]
+                                if not (custField >= low and custField <= hi):
+                                    custskip = True
+                            elif '~' in crit:
+                                if numpy.bitwise_and(custField, eval(crit.replace('~', '').strip())) > 0:
+                                    custskip = True
+                            else:
+                                if not (custField == eval(crit)):
+                                    custskip = True
+                        if custskip:
+                            cstskips += 1
+                            continue                                                
                         # check summary flag
-                        sumFlag = parser.get_cm(\
-                                  self.parmDict['overallQualFlag'], pxInd)
-                        if sumFlag % 2:
-                            continue
+                        #sumFlag = parser.get_cm(\
+                        #          self.parmDict['overallQualFlag'], pxInd)
+                        #if sumFlag % 2:
+                        #    sumskips += 1
+                        #    continue
+                        #
                         # check cloud fraction flag
                         cFrac = parser.get_cm(\
                                 self.parmDict['cloudFrac'], pxInd)
-                        if not (cFrac <= self.parmDict[\
-                                              'cloudFractUpperCutoff']):
-                            continue
+                        #if not (cFrac <= self.parmDict[\
+                        #                      'cloudFractUpperCutoff']):
+                        #    cldskips += 1
+                        #    continue
                         # check solar zenith angle flag
-                        solZenAng = parser.get_cm(\
-                                   self.parmDict['solarZenithAngle'], pxInd)
-                        if solZenAng > self.parmDict[\
-                                              'solarZenAngUpperCutoff']:
-                            continue
+                        #solZenAng = parser.get_cm(\
+                        #           self.parmDict['solarZenithAngle'], pxInd)
+                        #if solZenAng > self.parmDict[\
+                        #                      'solarZenAngUpperCutoff']:
+                        #    zenskips += 1
+                        #    continue
                         # check time flag
                         time = parser.get_cm(self.parmDict['time'], pxInd)
                         # calculate and factor in offset 
@@ -583,6 +622,9 @@ class OMNO2e_netCDF_avg_out_func(out_func):
                                 sumVars[field][gridInd] = \
                                      numpy.nansum([sumVars[field][gridInd][0],\
                                                    weightVals])
+                print 'Checked:', checked
+                print 'Excluded Sum,Cld,Zen,Cst', sumskips, cldskips, zenskips, cstskips
+                print 'Accepted:', checked - sumskips - cldskips - zenskips - cstskips
                 map['parser'] = parser  # return parser to map
                 
         # divide out variables by weights to get avgs. 
