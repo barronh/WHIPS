@@ -1,8 +1,3 @@
-WHIPS
-=====
-
-Wisconsin Horizontal Interpolation Program for Satellites provides custom gridding of satellite data (i.e., Level 2 to custom Level 3)
-
 PROJECT TITLE: WHIPS
 PURPOSE OF PROJECT: Provide a well-documented, easy-to-use general-purpose
                     processing module for processing satellite data

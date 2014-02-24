@@ -1,0 +1,501 @@
+INSTALL.txt
+
+This file provides instructions on how to install the whips
+program on your local *nix machine.  There are currently no plans to
+support a Windows installation.
+
+PREREQUISITES
+=============
+
+WHIPS depends on the following 3rd party pieces of software
+
+1) python (version 2.5.x or newer, but NOT version 3)
+
+   The software used here was all written for python version 2.5.x. or later
+   Though there is a version 3 of python, it is not backwards
+   compatible and should not be used.
+
+   Python may already be installed on your system.  Try executing
+
+   	  which python
+
+   to see if this is the case.  If you have it, try
+
+      	  python -V
+
+   and if the version number is greater than 2.5 you can skip this step.
+
+   If you do have to install python, or simply want a fresh copy, then
+   do the following:
+
+   1.1: Obtain the source code from the official python website
+      http://python.org/download/releases/
+
+   1.2: Untar the source
+   	  
+	  tar -xzvf python-2.x.y.tar.gz
+
+   1.3: Set any desired compilation environmental variables.  These
+      include all variables commonly recognized by autoconf scripts,
+      including:
+	  
+	CC for the C compiler
+	CFLAGS for the C compiler flags
+	CXX for the C++ compiler
+	CXXFLAGS for the C++ compiler flags
+	and many others
+
+      If you have no idea what any of this means don't worry about it,
+      it's more than likely safe to ignore it.
+
+   1.4: Change to the unpacked directory and run the configuration
+      script.  The script accepts numerous arguments, the most
+      important among them the --prefix argument that sets the base
+      directory for the install.
+
+      	  cd python-2.x.y
+	  ./configure --prefix=/path/to/base/directory
+
+   1.5: Make the program and install it to the base directory
+
+   	  make install
+
+   1.6: Confirm that your default python is now the one you just
+      installed.  Run the following commands to regenerate the list of
+      commands as if you'd just logged in, then look at the full path
+      to the default copy of python.
+
+          rehash
+	  which python
+ 
+      This should print out
+
+          /path/to/base/directory/bin/python
+
+      If it does not, you need to adjust your path in your shrc file
+      (~/.tcshrc, ~/.cshrc, ~/.bashrc, depending on your shell) to
+      point to the new copy of python.  Do NOT attempt to use an alias
+      to point to the correct copy of python as this can cause serious
+      errors with python's installation tools.
+      
+2) Install HDF4
+
+   The software was orignally written with HDF 4.2.6.  It should be
+   backwards compatible beyond that but no attempts have been made to
+   determine how far back it goes.
+
+   HDF4 software is necessary to read in the MOPITT data.
+
+   The following instructions detail how to install from source.
+   You're welcome to try to install the binaries available.
+
+   2.1: Download the HDF4 source code from
+      http://wwww.hdfgroup.org/ftp/HDF/HDF_Current/src/
+
+   2.2: Untar the source code
+
+   	  tar -xzvf hdf-4.2.6.tar.gz
+
+   2.3: Install JPEG.  The HDF4 installation depends on the JPEG
+      libraries, so we'll need to install those before we can proceed
+      with installing HDF4.
+
+      2.3.1: Download the JPEG (v66 or newer) source code.  A link is
+         provided at http://www.hdfgroup.org/release4/obtain.html
+
+      2.3.2: Untar JPEG
+
+      	     tar -xzvf jpegsrc.v66.tar.gz
+
+      2.3.3: Move to the untarred jpeg directory and run the configure
+         script.  Again, make sure to set the --prefix flag to the
+         base directory of the install
+
+	     cd jpeg-6b
+	     ./configure --prefix=/path/to/base/directory
+
+      2.3.4: Build the libraries
+
+      	     make
+
+      2.3.5: Install the libraries to the base directory.  Note that
+         unlike most well-behaved distributions, this actually has a
+         chance of failing.  If it complains about a file called
+         'cjpeg.1', try explicitly creating the filetree in which it
+         resides, then re-running the install.  Note that we have to
+	 run two separate commands to actually get the libraries.
+
+	      make install
+	      make install-lib
+
+   2.4: Install zlib.  The HDF4 installation depends on this library
+      as well.  We build it from source, though binaries may work
+      better for your system.
+
+      2.4.1: Obtain zlib.  Note that though it is linked from the HDF4
+         site, the link was broken as of the last time I checked.  The
+         source code can be obtained directly from http://zlib.net
+
+      2.4.2: Untar the zlib source distribution
+     
+	     tar -xzvf zlib-1.2.6.tar.gz
+
+      2.4.3: Change to folder and configure the zlib install.  As
+         always, set the base directory using the --prefix flag
+
+	     cd zlib-1.2.6
+	     ./configure --prefix=/path/to/base/directory
+
+      2.4.4: Test the installation if desired
+
+      	     make test
+
+      2.4.5: If the tests pass, install the libraries to the base
+         directory.
+
+	     make install
+
+   2.5: Set some environmental variables that will be needed during
+      the install.  Note that the F77 variable might not be necessary, but
+      CFLAGS does need to include the -fPIC flag
+
+      	     setenv F77 gfortran
+	     setenv CFLAGS -fPIC 
+
+      On 64-bit versions of OSX (and possibly other operating systems),
+      the compilers may get confused.  If this is the case, it can be
+      rectified by adjusting the above to the following:
+
+      	     setenv F77 gfortran
+	     setenv CFLAGS "-fPIC -m64"
+	     setenv FFLAGS -m64
+
+   2.6: Configure HDF for installation.  Note that unlike most
+      configurations, this step requires more than just the --prefix
+      flag.  Make sure to give the correct path the base directory
+      under which the zlib and jpeg installs (not the source code!)
+      live.  The --disable-netcdf is also critical, but may prevent
+      you from using this HDF build for other purposes.
+
+      	     cd hdf-4.2.6
+             ./configure --with-zlib=/path/to/base/directory \
+	     		 --with-jpeg=/path/to/base/directory \
+			 --disable-netcdf \
+			 --prefix=/path/to/base/directory
+
+   2.7: Build the HDF4 libraries
+
+   	     make
+
+   2.8: Test the installation
+
+   	     make test
+
+   2.9: Install to the base directory
+
+   	     make install
+
+3) Install HDF5
+
+   This is a completely separate install from HDF4.  You have to
+   install BOTH even though they are both HDF.  Provides read
+   functionality for HDF-EOS files used by OMI instruments, as well as
+   supporting the netCDF installation (step 4)
+
+   As per usual, it is probably possible to acquire binaries, but the
+   instructions below are for compilation from source.
+
+   3.1: Acquire the HDF5 source code from
+      http://wwww.hdfgroup.org/ftp/HDF5/current/src
+
+   3.2: Untar the source code.
+
+   	     tar -xzvf hdf5-1.8.8.tar.gz
+
+   3.3: Set an environment variable to point the configuration script
+      to the desired FORTRAN compilers.  The program has a really
+      buggy compiler autodetect "feature" that makes this necessary.
+
+      	    setenv FC gfortran
+
+   3.4: Configure, noting that this is again a case where the flags
+      passed to the configure script are mandatory.  Make sure that
+      the --with-zlib flag points to a valid directory that contains
+      the zlib library and another with the include files.  You 
+      should already have installed zlib under step 2.4 above.
+
+      	    cd hdf5-1.8.8
+      	    ./configure --prefix=/path/to/base/directory \
+	    		--enable-fortran \
+			--with-zlib=/path/to/base/directory/lib,/path/to/base/directory/include \
+
+   3.5: Build HDF5
+
+       	   make
+
+   3.6: Test the build
+
+       	   make check
+
+   3.7: Install the build
+
+       	   make install
+
+4) Install netCDF
+
+   netCDF is necessary to write out to the commonly used netCDF file
+   format.  The software has only been tested with a netcdf-4.1.3
+   installation.  Earlier versions of netCDF-4 might work, and 
+   there's even a chance netCDF-3 would work, but you're best off
+   with the latest verison.
+
+   4.1: Download the source from
+      http://www.unidata.ucar.edu/downloads/netcdf/index.jsp
+
+   4.2: Decompress the source code
+
+   	   untar -xzvf netcdf-4.1.3.tar.gz
+
+   4.3: Set environmental variables that will tell netCDF where the 
+      HDF5 installation lives.  We need to include both of these so
+      it can find the libraries and the include files
+
+      	   setenv LDFLAGS -L/path/to/base/directory/lib
+	   setenv CPPFLAGS -I/path/to/base/directory/include
+
+   4.4: Configure the installation using the prefix flag to specify
+      the base directory for the install.
+
+           cd netcdf-4.1.3
+	   ./configure --disable-fortran --prefix=/path/to/base/directory
+
+   4.5: Build the program
+   	   
+	   make
+
+   4.6: Test the build
+
+   	   make check
+
+   4.7: If the test ran successfully, install.  
+
+           make install
+
+5) Install the geos framework
+
+   The geos framework (short for geometry engine - open source) is a
+   library containing many common GIS functions.  We need it to build
+   shapely, the python module that we use to perform the geometry
+   operations needed in interpolation.
+
+   5.1: Obtain the source for the geos framework from
+      http://trac.osgeo.org/geos
+
+   5.2: Decompress the installation. 
+
+   	  bunzip2 geos-3.3.2.tar.bz2
+	  tar -xvf geos-3.3.2.tar
+
+   5.3: Configure the installtion, using the --prefix flag to specifiy
+      the base directory.
+
+      	  cd geos-3.3.2
+	  ./configure --prefix=/path/to/base/directory
+
+   5.4: Build geos
+
+   	  make
+
+   5.5: Install geos to the base directory
+
+   	  make install
+
+   5.6: If the library directory under your base directory is not in a
+      default location (IE /usr/local/lib) where the shell
+      automatically looks, you need to add it to the library path.
+      These lines should probably be added to your .tcshrc or .bashrc
+      or .cshrc file (depending on your shell) as whips won't work
+      properly if they are not.
+
+      	  setenv LD_LIBRARY_PATH /path/to/base/directory/lib:$LD_LIBRARY_PATH
+
+6) Install pyhdf 
+
+   This is, to the best of my knowledge, the only python library that
+   can read HDF4 files (like MOPITT).  It should theoretically be
+   installable using the same technique as other python modules, but
+   seems to be more finicky.
+
+   6.1: Download the source for pyhdf from
+      http://sourceforge.net/projects/pysclint
+
+   6.2: Untar the source 
+
+   	 tar -xzvf pyhdf-0.8.3.tar.gz
+
+   6.3: Set environment variables so that the pyhdf installation will
+      know where to find the hdf, zlib, and jpeg libraries.  Note that
+      if these are in different libraries, you'll need to set the
+      variables to point to multiple directories.  Note that because
+      these are only needed for the install they won't need to go in
+      the shrc file for your shell.
+
+         setenv INCLUDE_DIRS /path/to/base/directory
+	 setenv LIBRARY_DIRS /path/to/base/directory
+	 setenv NOSZIP 1
+
+   6.4: Go into the pyhdf folder and invoke the python setup script
+      (which will both compile and install the script)
+
+      	 cd pyhdf-0.8.3
+	 python setup.py install
+
+      If you run into problems, make sure that you properly set the
+      -fPIC flag when compiling HDF4 (see step 2.7)
+
+7) Install easy_install
+
+   easy_install is a widely implemented framework for the installation
+   of python modules.  It performs many of the features of a
+   traditional package manager like yum or rpm, but most critically
+   does NOT uninstall packages and does NOT chase down dependencies.
+   We're going to use it extensively from here on out to install the
+   python modules needed by whips
+
+   7.1: Obtain the "egg" (distributed package) of easy_install from
+      the maintainers at
+
+         http://pypi.python.org/pypi/setuptools#downloads
+      
+      Make sure to select the egg that matches your installation of
+      python.
+
+   7.2: Run the egg as a shell script and easy_install should install
+      itself under the binary directory associated with your python
+      installation.
+
+	 sh setuptools-0.6c11-py2.7.egg
+
+8) Install netCDF4-python
+
+   This particular python module requires a different installation 
+   approach than the others listed below, so we take care of it 
+   first.  It's used for writing results to the popular netCDF
+   file type.
+
+   8.1: Download the source code for netcdf4-python from 
+      code.google.com/p/netcdf4-python/downloads/list
+
+   8.2: Unpack the source distribution
+
+         tar -xzvf netcdf4-0.9.9.tar.gz
+
+   8.3: If you haven't done so already, set HDF5_DIR 
+      environmental variable to point to the base directory for
+      the HDF5 install.  In addition, set NETCDF4_DIR to point
+      to the base directory for the netCDF install.
+
+         setenv HDF5_DIR /path/to/base/directory/
+	 setenv NETCDF4_DIR /path/to/base/directory/
+
+   8.4: Build the netCDF4-python library
+
+   	 cd netCDF4-0.9.9
+   	 python setup.py build
+
+   8.5: Assuming the build didn't throw any errors, install 
+      the library.
+
+         python setup.py install
+
+   8.6: If you want to, test the installation.  Note that in 
+      some circumstances the library will work fine even if 
+      the tests refuse to run entirely.
+
+         cd test
+	 python run_all.py
+
+9) Install python modules available through easy_install
+
+   These python modules are all used by whips to perform various
+   operations.  They will be installed to whichever copy of python the
+   operating system finds first, which makes it all the more important
+   that you double check that this is the version you want (see step
+   1.6)
+
+   9.1: Install numpy, which is a basic array operation library.
+
+   	 easy_install numpy
+
+   9.2: Install shapely, a geometry library used by the interpolation
+      routines in whips
+
+      	 easy_install shapely
+
+   9.3: Install pyproj, which is a port of the popular PROJ4 fortran
+      library.  It provides the optimized projection functions used by
+      whips.
+
+	 easy_install PyProj
+
+   9.4: Install numexpr, which is required for pytables
+
+         easy_install numexpr
+
+   9.5: Install cython, which is also required for pytables
+
+   	 easy_install Cython
+
+   9.6: Install pytables, a program allowing python read/write
+      access to HDF5 files.
+
+      9.6.1: Tell pytables where the HDF5 installation is.  Give it
+         the base directory (as opposed to the library directory) via
+         the environment variable HDF5_DIR.  This environment variable
+         is only needed for the installation.
+
+	      setenv HDF5_DIR /path/to/base/directory
+
+      9.6.2: Install the actual pytables module itself (note that it
+         isn't called pytables!)
+
+	      easy_install tables
+
+      9.6.3: Add the lib directory where you installed tables to your
+         library path.  This should go in your .tcshrc or .bashrc or
+         .cshrc file (depending on your shell) for whips to function
+         properly
+
+	      setenv LD_LIBRARY_PATH /path/to/base/directory/lib:$LD_LIBRARY-PATH
+
+10) Install whips 
+
+   Like most of the other python modules described here, whips is
+   available through easy_install. 
+
+   10.1: Install whips using the easy_install command
+
+         easy_install whips
+
+   10.2: The whips.py executable will be installed in 
+
+         /path/to/base/directory/bin/   
+
+      so if that folder isn't on your path, you'll need to make 
+      it accessible from the command line.  The easiest means is 
+      probably to add it to the path in your remote config file 
+      (.tcshrc or .bashrc or .cshrc or ...).  This can be 
+      accomplished from .tcshrc by adding the following line.
+
+      	 setenv PATH $PATH:/path/to/base/directory/bin/
+
+      Note that the first time you do this, you'll need to run
+      
+         source ~/.tcshrc 
+
+      for it to take effect.
+
+
+
+
+  

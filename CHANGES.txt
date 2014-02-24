@@ -1,0 +1,17 @@
+v<1.0.0>, <3/9/2012> -- Initial release.
+v<1.0.1>, <3/9/2012> -- Culled the reST file for website brevity.
+v<1.0.2>, <3/9/2012> -- Removed the last traces of scipy.
+v<1.0.3>, <3/14/2012> -- Updated licence and acknowledgement policy.
+v<1.0.4>, <3/23/2012> -- Fixed bug in OMI NO2 processing. WHIPS now supports running based on an input textfile.
+v<1.0.5>, <3/26/2012> -- Degenerate case (1x1 grid) was broken for one of the outFuncs.  Fixed.
+v<1.0.6>, <4/13/2012> -- Added Version flag, more specific filetype support
+v<1.1.0>, <5/17/2012> -- New filetypes interface implemented and tested. 
+v<1.1.1>, <6/15/2012> -- Resolved --includeGrid to properly use absolute file paths
+v<1.1.2>, <6/21/2012> -- Resolved bug in gridfile output handler
+v<1.1.3>, <6/26/2012> -- Resolved further issues in gridfile output handler
+v<1.1.4>, <7/12/2012> -- Improved efficiency of intersection algorithms
+v<1.1.5>, <7/16/2012> -- Fixed bug with intersection when pixels had NaN coordinates
+v<1.1.6>, <7/23/2012> -- Added valid pixel count output to OMNO2e_netCDF_avg
+v<1.2.0>, <10/12/2012> -- Release of support for MODIS AOD processing
+v<1.2.1>, <10/19/2012> -- Minor updates to documentation
+v<1.2.2>, <8/28/2013> -- Fixed bug causing unexpected rescaling of values for NASA OMI products
