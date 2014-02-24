@@ -103,11 +103,8 @@ class OMNO2e_wght_avg_BORKED(out_func):
     
     parameters dict must contain keys:
         toAvg
-        overallQualFlag
+        customCriteria
         cloudFrac
-        solarZenithAngle
-        cloudFractUpperCutoff
-        solarZenAngUpperCutoff
         pixIndXtrackAxis
         fillVal
     
@@ -119,36 +116,26 @@ class OMNO2e_wght_avg_BORKED(out_func):
     '''  
     @staticmethod
     def parm_list():
-        return ['toAvg', 'overallQualFlag', 'cloudFrac', 
-                'solarZenithAngle', 'cloudFractUpperCutoff',
+        return ['toAvg', 'customCritiera', 'cloudFrac', 
                 'pixIndXtrackAxis', 'fillVal']
 
     @staticmethod
     def required_parms():
         return {'toAvg' : ('The name of the field to be averaged',None),
-                'overallQualFlag' : ('The name of the field containing' \
-                                     ' the overall quality flag for the' \
-                                     ' pixels.  This flag should be true' \
-                                     ' (1) for invalid pixels and false' \
-                                     ' (0) for valid pixels.\n{ OMI KNMI' \
-                                     ' - TroposphericColumnFlag\n  OMI NASA' \
-                                     ' - vcdQualityFlags }',None),
+                'customCriteria' : ('A string that can be evaluated' \
+                                    'according to the syntax in the OMNO2d' \
+                                    'Description field as described in the' \
+                                    'file specification document, except that'\
+                                    'data is pre-scaled. For example:\n'\
+                                    '\t"SolarZenithAngle=[0:85],CloudFraction=[0:0.3],VcdQualityFlags=~19,XTrackQualityFlags=0,RootMeanSquareErrorOfFit=[0:0.0003],TerrainReflectivity=[0:0.3]"\n\n' \
+                                    'would be interpreted as zenith between 0 and 85;'\
+                                    'cloud fraction and terrain reflectivity must '\
+                                    'be between  0 and 0.3; VcdQualityFlags'\
+                                    'exclude 1, 2, 16, 17, 18, and 19; XTrackQualityFlags'\
+                                    'only include zeros; and RMS must be between 0 and 0.0003', None),
                 'cloudFrac' : ('The name of the field containing the ' \
                                'cloud fractions.\n{ OMI KNMI - CloudFraction' \
                                '\n  OMI NASA - CloudFraction }',None),
-                'solarZenithAngle' : ('The name of the field containing the ' \
-                                      'solar zenith angles in degrees.\n{ ' \
-                                      'OMI KNMI - SolarZenithAngle\n  OMI' \
-                                      ' NASA - SolarZenithAngle }',None),
-                'cloudFractUpperCutoff' : ('The maximum cloud fraction to ' \
-                                           'allow before excluding pixel ' \
-                                           'from average.  Suggested value ' \
-                                           'from NASA is 0.3','decimal'),
-                'solarZenAngUpperCutoff' : ('The maximum solar zenith angle ' \
-                                            'to allow before excluding pixel ' \
-                                            'from average.  Suggested value ' \
-                                            'from NASA is 85.  Must be in ' \
-                                            'degrees.','decimal'),
                 'pixIndXtrackAxis' : ('The dimension order (0 based) of the ' \
                                       'of the "cross-track" dimension (which' \
                                       'ever dimension has size 60).  For all' \
@@ -174,10 +161,8 @@ class OMNO2e_wght_avg_BORKED(out_func):
         # even though IO interface handles casting already
         # a catchblock has been added here for safety
         # in case someone wants to use this class directly
-        castDict = {'toAvg':str, 'overallQualFlag':str,
-                    'cloudFrac':str, 'solarZenithAngle':str,
-                    'cloudFractUpperCutoff':float, 
-                    'solarZenAngUpperCutoff':float,
+        castDict = {'toAvg':str, 'customCriteria':str,
+                    'cloudFrac':str,
                     'pixIndXtrackAxis':int, 'fillVal':float}
         for (k,func) in castDict.items():
             self.parmDict[k] = func(self.parmDict[k])
@@ -196,15 +181,12 @@ class OMNO2e_wght_avg_BORKED(out_func):
                     print('Processing {0} for output at {1}.'.format(\
                             p.name, str(datetime.datetime.now())))
                 for (k,v) in map.iteritems():
-                    sumFlag = numpy.array([p.get_cm(self.parmDict['overallQualFlag'], pxind)
-                                            for (pxind, unused_weight) in v])
+                    # Replace with custom criteria
+                    #sumFlag = numpy.array([p.get_cm(self.parmDict['overallQualFlag'], pxind)
+                    #                        for (pxind, unused_weight) in v])
                     sumFlag = numpy.mod(sumFlag, 2)
                     cFrac = numpy.array([p.get_cm(self.parmDict['cloudFrac'], pxind)
                                           for (pxind, unused_weight) in v])
-                    cFracFlag = cFrac > self.parmDict['cloudFractUpperCutoff']
-                    solZen = numpy.array([p.get_cm(self.parmDict['solarZenithAngle'], pxind)
-                                          for (pxind, unused_weight) in v])
-                    solZenFlag = solZen > self.parmDict['solarZenAngUpperCutoff']
                     totFlag = numpy.logical_or(numpy.logical_or(sumFlag, cFracFlag), solZenFlag)
                     fov = numpy.array([pxind[self.parmDict['pixIndXtrackAxis']]
                                         for (pxind, unused_weight) in v])
@@ -249,18 +231,20 @@ class OMNO2e_netCDF_avg_out_func(out_func):
     Set up to work specifically for OMI instruments.
 
     parameters dict must contain keys:
-        overallQualFlag:
-            Flag used as overall quality.  Assumed that
-            when this flag is set, the data is BAD and 
-            the pixel is ignored
+        customCriteria:
+            Criteria for pixel 
+            selection. Each ciriteria is separated
+            by a comma, each critieria follows the 
+            OMI NO2 field "Description" attribute
+            as documented in section 3.4.1 of the 
+            OMNO2d File Specification document
+            version 1.1 (Jan 10, 2013). For example,            
+            { OMI NASA OMNO2d - SolarZenithAngle=[0:85],VcdQualityFlags=~1,CloudFraction=[0:0.3]
+              OMI NASA OMNO2d - SolarZenithAngle=[0:85],VcdQualityFlags=~19,XTrackQualityFlags=0,RootMeanSquareErrorOfFit=[0:0.0003],TerrainReflectivity=[0:0.3] }
         cloudFrac:
             field with cloud fraction (0 to 1).  When this
             field is GREATER than the cutoff value the
             pixel is ignored.
-        solarZenithAngle: 
-            Field with solar zenith angle (in degrees). 
-            When this field is GREATER than the cutoff
-            value the pixel is ignored.
         time:
             Field with the timestamps for each pixel. 
             Assumed to be in TAI-93 format.  When
@@ -316,12 +300,6 @@ class OMNO2e_netCDF_avg_out_func(out_func):
             Final Time we want in included in file.
             Times must be in TAI93 standard format.
             *format hh:mm:ss_MM-DD-YYYY will also be converted automatically.
-        cloudFractUpperCutoff:
-            Pixels with a higher cloud fraction than this 
-            value will be ignored.
-        solarZenAngUpperCutoff:
-            Pixels with a higher solar zenith angle than
-            this value will be ignored.
         pixIndXtrackAxis:
             The axis (IE which dimension in memory order)
             that specifies the pixels cross-track position.
@@ -346,22 +324,14 @@ class OMNO2e_netCDF_avg_out_func(out_func):
     '''
     @staticmethod
     def parm_list():
-        return ['overallQualFlag', 'cloudFrac', 'solarZenithAngle',
+        return ['customCriteria', 'cloudFrac',
                 'time', 'longitude', 'inFieldNames', 'outFieldNames',
                 'outUnits', 'extraDimLabel', 'extraDimSize',
                 'timeComparison', 'timeStart', 'timeStop',
-                'cloudFractUpperCutoff', 'solarZenAngUpperCutoff',
                 'pixIndXtrackAxis', 'fillVal', 'includePixelCount']
     @staticmethod
     def required_parms():
-        return {'overallQualFlag' : ('The name of the field containing ' \
-                                     'the overall quality flag for the ' \
-                                     'pixels.  This flag should be true (1) ' \
-                                     'for invalid pixels and false (0) for ' \
-                                     'valid pixels.\n{ OMI KNMI - Tropo' \
-                                     'sphericColumnFlag\n  OMI NASA - vcd' \
-                                     'QualityFlags }',None),
-                'customCriteria' : ('A string that can be evaluated' \
+        return {'customCriteria' : ('A string that can be evaluated' \
                                     'according to the syntax in the OMNO2d' \
                                     'Description field as described in the' \
                                     'file specification document, except that'\
@@ -375,10 +345,6 @@ class OMNO2e_netCDF_avg_out_func(out_func):
                 'cloudFrac' : ('The name of the field containing the ' \
                                'cloud fractions\n{ OMI KNMI - CloudFraction' \
                                '\n  OMI NASA - CloudFraction }',None),
-                'solarZenithAngle' : ('The name of the field containing the '\
-                                      'solar zenith angles in degrees.\n{ ' \
-                                      'OMI KNMI - SolarZenithAngle\n  OMI ' \
-                                      'NASA - SolarZenithAngle }',None),
                 'time' : ('The name of the field containing the timestamps. '\
                           ' Timestamps are assumed to be the in TAI-93 ' \
                           'format.\n{ OMI KNMI - Time\n  OMI NASA - TIME }', \
@@ -428,15 +394,6 @@ class OMNO2e_netCDF_avg_out_func(out_func):
                                'input files after this time will be filtered ' \
                                'out.  Must be in the format hh:mm:ss_MM-DD-' \
                                'YYYY','time'),
-                'cloudFractUpperCutoff' : ('The maximum cloud fraction to ' \
-                                           'allow before excluding pixel from '\
-                                           'average.  Suggested value from ' \
-                                           'NASA is 0.3','decimal'),
-                'solarZenAngUpperCutoff' : ('The maximum solar zenith angle to'\
-                                            ' allow before excluding pixel ' \
-                                            'from average, in degrees.  ' \
-                                            'Suggested value from NASA is 85.',\
-                                            'int'),
                 'pixIndXtrackAxis' : ('The dimension order (0 based) of the ' \
                                       '"cross-track" dimension (whichever ' \
                                       'dimension has size 60).  For all ' \
@@ -472,15 +429,13 @@ class OMNO2e_netCDF_avg_out_func(out_func):
         # even though IO interface handles casting already,
         # a catchblock has been added here for safety
         # in case someone wants to use this class directly
-        castDict = {'customCriteria':str,
-                    'overallQualFlag':str, 'cloudFrac':str,
-                    'solarZenithAngle':str, 'time':str,
+        castDict = {'customCriteria':str, 'cloudFrac':str,
+                    'time':str,
                     'longitude':str, 'inFieldNames':list,
                     'outFieldNames':list, 'outUnits':list,
                     'extraDimLabel':list, 'extraDimSize':list,
                     'timeComparison':str, 'timeStart':tai93conv,
-                    'timeStop':tai93conv, 'cloudFractUpperCutoff':float,
-                    'solarZenAngUpperCutoff':int, 'pixIndXtrackAxis':int,
+                    'timeStop':tai93conv, 'pixIndXtrackAxis':int,
                     'fillVal':float, 'includePixelCount':boolCaster}
         for (k,func) in castDict.items():
             try:
@@ -559,28 +514,8 @@ class OMNO2e_netCDF_avg_out_func(out_func):
                         if custskip:
                             cstskips += 1
                             continue                                                
-                        # check summary flag
-                        #sumFlag = parser.get_cm(\
-                        #          self.parmDict['overallQualFlag'], pxInd)
-                        #if sumFlag % 2:
-                        #    sumskips += 1
-                        #    continue
-                        #
-                        # check cloud fraction flag
                         cFrac = parser.get_cm(\
                                 self.parmDict['cloudFrac'], pxInd)
-                        #if not (cFrac <= self.parmDict[\
-                        #                      'cloudFractUpperCutoff']):
-                        #    cldskips += 1
-                        #    continue
-                        # check solar zenith angle flag
-                        #solZenAng = parser.get_cm(\
-                        #           self.parmDict['solarZenithAngle'], pxInd)
-                        #if solZenAng > self.parmDict[\
-                        #                      'solarZenAngUpperCutoff']:
-                        #    zenskips += 1
-                        #    continue
-                        # check time flag
                         time = parser.get_cm(self.parmDict['time'], pxInd)
                         # calculate and factor in offset 
                         # if the user wanted us to
@@ -659,8 +594,7 @@ class OMNO2e_netCDF_avg_out_func(out_func):
         setattr(outFid, 'Version', vsnmsg(version))
         setattr(outFid, 'File_start_time', utils.nsecs_to_timestr(self.parmDict['timeStart'], '00:00:00 01-01-1993'))
         setattr(outFid, 'File_end_time', utils.nsecs_to_timestr(self.parmDict['timeStop'], '00:00:00 01-01-1993'))
-        setattr(outFid, 'Max_valid_cloud_fraction', self.parmDict['cloudFractUpperCutoff'])
-        setattr(outFid, 'Max_valid_solar_zenith_angle', self.parmDict['solarZenAngUpperCutoff'])
+        setattr(outFid, 'FilterDefinition', self.parmDict['customCriteria'])
         setattr(outFid, 'Time_comparison_scheme', self.parmDict['timeComparison'])
         fileListStr = ' '.join([map['parser'].name for map in maps])
         setattr(outFid, 'Input_files', fileListStr)
