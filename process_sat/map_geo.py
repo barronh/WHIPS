@@ -27,6 +27,7 @@ The returned dictionary must be formatted as follows:
 import sys
 from itertools import izip
 import datetime
+import time
 import pdb
 
 import map_helpers
@@ -72,25 +73,40 @@ def global_intersect_map_geo(parser, griddef, verbose=True):
     if verbose:
         print('Mapping '+parser.name+'\nat '+str(datetime.datetime.now()))  
     outer_indices = griddef.indLims()
+    outer_poly = (geom.Polygon([(outer_indices[0], outer_indices[2]),
+                               (outer_indices[0], outer_indices[3]),
+                               (outer_indices[1], outer_indices[3]),
+                               (outer_indices[1], outer_indices[2])]))
+    outer_polyp = prep(outer_poly)              
     # create the dictionary we'll use as a map
     map = map_helpers.init_output_map(outer_indices)
     map['parser'] = parser
+    tpreps = []
+    tchecks = []
+    tskips = []
     # we're going to hold onto both the prepared and unprepared versions
     # of the polys, so we can access the fully method set in the unprep
     # polys, but still do fast comparisons
     gridPolys = map_helpers.rect_grid_polys(outer_indices)
     prepPolys = map_helpers.rect_grid_polys(outer_indices)
     if verbose: print('prepping polys in grid')
-    for poly in prepPolys.itervalues():
-        poly = prep(poly)  # prepare these, they're going to get compared a lot
+    for polyk in prepPolys.keys():
+        prepPolys[polyk] = prep(prepPolys[polyk]) # going to get compared a lot
     if verbose: print('done prepping polys in grid')
     cornersStruct = parser.get_geo_corners()
     (row, col) = griddef.geoToGridded(cornersStruct['lat'], \
                                       cornersStruct['lon']) 
     ind = cornersStruct['ind']
+    if cornersStruct['lon'].shape[-1] == 4:
+        lon = cornersStruct['lon']
+        leftlon = lon[..., [0, 3]].max(-1)
+        rightlon = lon[..., [1, 2]].min(-1)
+        loncheck = (leftlon > rightlon)
+
     # reshape the matrixes to make looping workable
     row = row.reshape(-1,4)
     col = col.reshape(-1,4)
+    loncheck = loncheck.ravel()
     ind = ind.reshape(row.shape[0],-1)
     if verbose: print('Intersecting pixels')
     # create the appropriate pixel(s) depending on whether
@@ -98,18 +114,29 @@ def global_intersect_map_geo(parser, griddef, verbose=True):
     minCol = griddef.indLims()[2]
     maxCol = griddef.indLims()[3] + 1
     midCol = (minCol+maxCol)/2.0
-    for (pxrow, pxcol, pxind) in izip(row, col, ind):
+    dummy, (colNeg180, colPos180) = griddef.geoToGridded(numpy.array([0, 0]), numpy.array([-180, 180]))
+    for (pxrow, pxcol, pxind, pxcheck) in izip(row, col, ind, loncheck):
+        if verbose:
+            t0 = time.time()
         if (numpy.any(numpy.isnan(pxrow)) or 
             numpy.any(numpy.isnan(pxcol))):
             continue # skip incomplete pixels
         pointsTup = zip(pxrow, pxcol)
         prelimPoly = geom.MultiPoint(pointsTup).convex_hull
+        if not outer_polyp.intersects(prelimPoly.envelope):
+            if verbose:
+                tskips.append(time.time() - t0)
+            continue
         (bbBot, bbLeft, bbTop, bbRight) = prelimPoly.bounds
         if bbLeft < midCol and bbRight > midCol:
             pointsLeft = [ (r,c) for (r,c) in pointsTup if c < midCol]
             pointsRight = [ (r,c) for (r,c) in pointsTup if c >= midCol]
-            pointsLeft += [ (bbBot, minCol), (bbTop, minCol) ]
-            pointsRight += [ (bbBot, maxCol), (bbTop, maxCol) ]
+            if pxcheck:
+                pointsLeft += [ (bbBot, colNeg180), (bbTop, colNeg180) ]
+                pointsRight += [ (bbBot, colPos180), (bbTop, colPos180) ]
+            else:
+                pointsLeft += [ (bbBot, minCol), (bbTop, minCol) ]
+                pointsRight += [ (bbBot, maxCol), (bbTop, maxCol) ]
             polyLeft = geom.MultiPoint(pointsLeft).convex_hull
             polyRight = geom.MultiPoint(pointsRight).convex_hull
             splitArea = polyLeft.area + polyRight.area
@@ -121,11 +148,28 @@ def global_intersect_map_geo(parser, griddef, verbose=True):
         else:
             pixPolys = [prelimPoly]
         # try intersecting the poly(s) with all the grid polygons
+        if verbose:
+            t1 = time.time()
         for poly in pixPolys:
             for key in map_helpers.get_possible_cells(outer_indices, poly):
-                if prepPolys[key].intersects(poly) and not gridPolys[key].touches(poly):
-                    map[key].append((tuple(pxind), None))
-    if verbose: print('Done intersecting.')
+                # Prepped contains is much faster than 
+                # than the combination of prepped intersection
+                # and unprepped touches
+                if prepPolys[key].intersects(poly) and (prepPolys[key].contains(poly) or not gridPolys[key].touches(poly)):
+                        map[key].append((tuple(pxind), None))
+        if verbose:
+            t2 = time.time()
+            tprep, tcheck = t1 - t0, t2 - t1
+            tpreps.append(tprep)
+            tchecks.append(tcheck)
+    if verbose:
+        print('Checked pixels:', len(tpreps))
+        print('Pixel processing:', sum(tpreps))
+        print('Pixel checking:', sum(tchecks))
+        print('         Total:', sum(tpreps) + sum(tchecks))
+        print('Skipped pixels:', len(tskips))
+        print('Pixel skip time:',sum(tskips))
+        print('Done intersecting.')
     return map
 
     
@@ -196,8 +240,10 @@ def regional_intersect_map_geo(parser, griddef, verbose=True):
             pixPoly = geom.MultiPoint(zip(pxrow, pxcol)).convex_hull
             
             for key in map_helpers.get_possible_cells(outer_indices, pixPoly):
-                if prepPolys[key].intersects(pixPoly) and not \
-                                  gridPolys[key].touches(pixPoly) :
+                # Prepped contains is much faster than 
+                # than the combination of prepped intersection
+                # and unprepped touches
+                if prepPolys[key].intersects(pixPoly) and (prepPolys[key].contains(pixPoly) or not gridPolys[key].touches(pixPoly)):
                     map[key].append((tuple(pxind), None))
         print('Done intersecting.')
     else:
